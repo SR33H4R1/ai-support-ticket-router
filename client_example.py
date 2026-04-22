@@ -3,7 +3,7 @@ from __future__ import annotations
 import requests
 
 
-BASE_URL = "http://127.0.0.1:5000"
+BASE_URL = "http://127.0.0.1:8000"
 
 
 def main() -> None:
@@ -15,8 +15,8 @@ def main() -> None:
         "user_name": "Sreehari",
         "message": "My subscription renewed twice this month and I need help with the extra charge.",
         "history": [
-            ("human", "Hi"),
-            ("ai", "Hello, how can I help you today?"),
+            {"role": "human", "content": "Hi"},
+            {"role": "ai", "content": "Hello, how can I help you today?"},
         ],
     }
 
@@ -26,4 +26,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

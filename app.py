@@ -2,7 +2,8 @@ from __future__ import annotations
 
 from typing import Any
 
-from flask import Flask, jsonify, request
+from fastapi import FastAPI, HTTPException
+from pydantic import BaseModel, field_validator
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder, PromptTemplate
 from langchain_core.runnables import RunnableLambda, RunnablePassthrough
@@ -26,6 +27,50 @@ CLASSIFIER_SCHEMA = {
     },
     "required": ["department", "reason"],
 }
+
+
+
+class HistoryItem(BaseModel):
+    role: str
+    content: str
+
+    @field_validator("role")
+    @classmethod
+    def validate_role(cls, v: str) -> str:
+        if v not in {"human", "ai"}:
+            raise ValueError("role must be 'human' or 'ai'")
+        return v
+
+
+class TicketRequest(BaseModel):
+    user_name: str
+    message: str
+    history: list[HistoryItem] = []
+
+    @field_validator("user_name", "message")
+    @classmethod
+    def must_not_be_blank(cls, v: str) -> str:
+        if not v.strip():
+            raise ValueError("Field must not be blank")
+        return v.strip()
+
+
+class ClassificationResult(BaseModel):
+    department: str
+    reason: str
+
+
+class TicketResponse(BaseModel):
+    user_name: str
+    message: str
+    classification: ClassificationResult
+    response: str
+
+
+class HealthResponse(BaseModel):
+    status: str
+    model: str
+
 
 
 def normalize_history(payload: dict[str, Any]) -> list[tuple[str, str]]:
@@ -118,35 +163,35 @@ def build_chain(model_name: str = MODEL_NAME):
     )
 
 
-app = Flask(__name__)
+
+app = FastAPI(
+    title="AI Support Ticket Router",
+    description="Classifies support tickets and routes them to billing or technical departments using LLMs.",
+    version="1.0.0",
+)
+
 ticket_chain = build_chain()
 
 
-@app.get("/health")
-def health() -> Any:
-    return jsonify({"status": "ok", "model": MODEL_NAME})
+@app.get("/health", response_model=HealthResponse)
+async def health():
+    return HealthResponse(status="ok", model=MODEL_NAME)
 
 
-@app.post("/ticket")
-def ticket() -> Any:
-    payload = request.get_json(silent=True)
-
-    if not isinstance(payload, dict):
-        return jsonify({"error": "Request body must be valid JSON."}), 400
-
-    user_name = payload.get("user_name")
-    message = payload.get("message")
-
-    if not isinstance(user_name, str) or not user_name.strip():
-        return jsonify({"error": "Field 'user_name' is required."}), 400
-
-    if not isinstance(message, str) or not message.strip():
-        return jsonify({"error": "Field 'message' is required."}), 400
-
-    result = ticket_chain.invoke(payload)
-    return jsonify(result)
+@app.post("/ticket", response_model=TicketResponse)
+async def create_ticket(ticket: TicketRequest):
+    try:
+        payload = {
+            "user_name": ticket.user_name,
+            "message": ticket.message,
+            "history": [{"role": h.role, "content": h.content} for h in ticket.history],
+        }
+        result = ticket_chain.invoke(payload)
+        return TicketResponse(**result)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 if __name__ == "__main__":
-    app.run(host="127.0.0.1", port=5000, debug=False)
-
+    import uvicorn
+    uvicorn.run(app, host="127.0.0.1", port=8000)
