@@ -1,18 +1,19 @@
 # AI Support Ticket Router
 
-AI Support Ticket Router is a small Flask + LangChain project that classifies support tickets and routes them to either a billing or technical support response flow using a local Ollama model.
+AI Support Ticket Router is a FastAPI + LangChain project that classifies support tickets and routes them to either a billing or technical support response flow using a local Ollama model.
 
 ## What it does
 
-1. Accepts a support ticket as JSON.
+1. Accepts a support ticket as JSON via a validated API endpoint.
 2. Uses structured output to classify the ticket as `billing` or `tech`.
 3. Generates a department-specific response.
-4. Returns both the classification and the final response as JSON.
+4. Returns both the classification and the final response as a typed JSON response.
 
 ## Tech stack
 
 - Python
-- Flask
+- FastAPI
+- Pydantic
 - LangChain
 - Ollama
 
@@ -45,6 +46,8 @@ ollama pull llama3.1
 python app.py
 ```
 
+API docs available at `http://127.0.0.1:8000/docs`
+
 ## Run the sample client
 
 ```bash
@@ -59,15 +62,15 @@ Returns a simple status response.
 
 ### `POST /ticket`
 
-Request body:
+Request body (validated via Pydantic):
 
 ```json
 {
   "user_name": "Sreehari",
   "message": "My app keeps crashing after the latest update.",
   "history": [
-    ["human", "Hi"],
-    ["ai", "Hello, how can I help you today?"]
+    {"role": "human", "content": "Hi"},
+    {"role": "ai", "content": "Hello, how can I help you today?"}
   ]
 }
 ```
